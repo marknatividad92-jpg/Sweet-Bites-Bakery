@@ -1,0 +1,523 @@
+// DEFAULT PRODUCTS
+const defaultProducts = [
+{ id: 1, name: "Chocolate Bread", price: 25, category: "Bakery", image: "https://images.unsplash.com/photo-1608198093002-ad4e005484f1?w=600" },
+{ id: 2, name: "Cheese Bread", price: 20, category: "Bakery", image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600" },
+{ id: 3, name: "Chicken Rice Meal", price: 65, category: "Student Meal", image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600" },
+{ id: 4, name: "Hotdog Sandwich", price: 35, category: "Student Meal", image: "https://images.unsplash.com/photo-1612392062798-2dbaa8f7f2c8?w=600" },
+{ id: 5, name: "Iced Coffee", price: 35, category: "Drinks", image: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=600" },
+{ id: 6, name: "French Fries", price: 40, category: "Snacks", image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600" },
+{ id: 7, name: "Donut", price: 15, category: "Bakery", image: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600" }
+];
+
+// LOAD DATA
+function loadData(key, fallback) {
+try {
+const saved = localStorage.getItem(key);
+return saved ? JSON.parse(saved) : fallback;
+} catch (error) {
+return fallback;
+}
+}
+
+let products = loadData("sweetBitesProducts", defaultProducts);
+let cart = loadData("sweetBitesCart", []);
+let orders = loadData("sweetBitesOrders", []);
+
+function saveData() {
+try {
+localStorage.setItem("sweetBitesProducts", JSON.stringify(products));
+localStorage.setItem("sweetBitesCart", JSON.stringify(cart));
+localStorage.setItem("sweetBitesOrders", JSON.stringify(orders));
+} catch (error) {
+alert("Storage is full. Please use a smaller product picture.");
+}
+}
+
+// PAGE NAVIGATION
+function showPage(pageId) {
+document.querySelectorAll(".section").forEach(section => {
+section.classList.remove("active");
+});
+
+const page = document.getElementById(pageId);
+if (page) page.classList.add("active");
+
+if (pageId === "menu") displayProducts();
+if (pageId === "cart") displayCart();
+if (pageId === "orders") displayOrders();
+
+window.scrollTo(0, 0);
+}
+
+document.querySelectorAll("[data-page]").forEach(button => {
+button.addEventListener("click", function() {
+showPage(this.dataset.page);
+});
+});
+
+// PLACEHOLDER IMAGE
+const placeholderImage =
+"data:image/svg+xml;charset=UTF-8," +
+encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250">
+<rect width="100%" height="100%" fill="#f3d5b5"/>
+<text x="50%" y="50%" font-size="25"
+text-anchor="middle" fill="#8b4513">No Image</text>
+</svg>
+`);
+
+// DISPLAY PRODUCTS
+function displayProducts() {
+const productList = document.getElementById("productList");
+const search = document.getElementById("searchInput").value.toLowerCase();
+const category = document.getElementById("categoryFilter").value;
+
+const filteredProducts = products.filter(product => {
+return product.name.toLowerCase().includes(search) &&
+(category === "All" || product.category === category);
+});
+
+productList.innerHTML = "";
+
+if (filteredProducts.length === 0) {
+productList.innerHTML = '<p class="empty">No products found.</p>';
+return;
+}
+
+filteredProducts.forEach(product => {
+const card = document.createElement("div");
+card.className = "product-card";
+
+const image = document.createElement("img");
+image.src = product.image || placeholderImage;
+image.alt = product.name;
+image.onerror = function() {
+this.onerror = null;
+this.src = placeholderImage;
+};
+
+const categoryLabel = document.createElement("span");
+categoryLabel.className = "category";
+categoryLabel.textContent = product.category;
+
+const name = document.createElement("h3");
+name.textContent = product.name;
+
+const price = document.createElement("p");
+price.className = "price";
+price.textContent = "₱" + Number(product.price).toFixed(2);
+
+const addButton = document.createElement("button");
+addButton.className = "main-btn";
+addButton.textContent = "Add to Cart";
+addButton.addEventListener("click", () => addToCart(product.id));
+
+const deleteButton = document.createElement("button");
+deleteButton.className = "delete-btn";
+deleteButton.textContent = "Delete";
+deleteButton.addEventListener("click", () => deleteProduct(product.id));
+
+card.append(image, categoryLabel, name, price, addButton, deleteButton);
+productList.appendChild(card);
+});
+}
+
+// SEARCH AND FILTER
+document.getElementById("searchInput").addEventListener("input", displayProducts);
+document.getElementById("categoryFilter").addEventListener("change", displayProducts);
+
+// IMAGE PREVIEW
+const imageInput = document.getElementById("productImage");
+const imagePreview = document.getElementById("imagePreview");
+
+imageInput.addEventListener("change", function() {
+const file = this.files[0];
+
+imagePreview.style.display = "none";
+imagePreview.src = "";
+
+if (!file) return;
+
+if (!file.type.startsWith("image/")) {
+alert("Please choose a valid image file.");
+this.value = "";
+return;
+}
+
+if (file.size > 10 * 1024 * 1024) {
+alert("Please choose an image smaller than 10 MB.");
+this.value = "";
+return;
+}
+
+const reader = new FileReader();
+
+reader.onload = function(event) {
+imagePreview.src = event.target.result;
+imagePreview.style.display = "block";
+};
+
+reader.readAsDataURL(file);
+});
+
+// COMPRESS IMAGE
+function compressImage(file) {
+return new Promise((resolve, reject) => {
+const reader = new FileReader();
+
+reader.onload = function(event) {
+const image = new Image();
+
+image.onload = function() {
+const canvas = document.createElement("canvas");
+const ratio = Math.min(800 / image.width, 800 / image.height, 1);
+
+canvas.width = Math.round(image.width * ratio);
+canvas.height = Math.round(image.height * ratio);
+
+canvas.getContext("2d").drawImage(
+image, 0, 0, canvas.width, canvas.height
+);
+
+resolve(canvas.toDataURL("image/jpeg", 0.75));
+};
+
+image.onerror = reject;
+image.src = event.target.result;
+};
+
+reader.onerror = reject;
+reader.readAsDataURL(file);
+});
+}
+
+// ADD NEW PRODUCT
+document.getElementById("productForm").addEventListener("submit", async function(event) {
+event.preventDefault();
+
+const name = document.getElementById("productName").value.trim();
+const price = parseFloat(document.getElementById("productPrice").value);
+const category = document.getElementById("productCategory").value;
+const file = imageInput.files[0];
+
+if (!name || !category || !file || !Number.isFinite(price) || price <= 0) {
+alert("Please complete all product information.");
+return;
+}
+
+if (products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+alert("This product already exists.");
+return;
+}
+
+try {
+const imageData = await compressImage(file);
+
+products.push({
+id: Date.now(),
+name,
+price,
+category,
+image: imageData
+});
+
+saveData();
+this.reset();
+
+imagePreview.src = "";
+imagePreview.style.display = "none";
+
+alert("Product added successfully!");
+showPage("menu");
+
+} catch (error) {
+alert("Unable to add product. Please try another picture.");
+}
+});
+
+// DELETE PRODUCT
+function deleteProduct(id) {
+if (!confirm("Are you sure you want to delete this product?")) return;
+
+products = products.filter(product => product.id !== id);
+cart = cart.filter(item => item.productId !== id);
+
+saveData();
+displayProducts();
+
+alert("Product deleted successfully!");
+}
+
+// ADD TO CART
+function addToCart(id) {
+const product = products.find(p => p.id === id);
+
+if (!product) {
+alert("Product not found.");
+return;
+}
+
+const existingItem = cart.find(item => item.productId === id);
+
+if (existingItem) {
+existingItem.quantity++;
+} else {
+cart.push({ productId: id, quantity: 1 });
+}
+
+saveData();
+alert(product.name + " added to your cart!");
+}
+
+// DISPLAY CART
+function displayCart() {
+const cartItems = document.getElementById("cartItems");
+cartItems.innerHTML = "";
+
+let total = 0;
+
+if (cart.length === 0) {
+cartItems.innerHTML = '<p class="empty">Your cart is empty.</p>';
+}
+
+cart.forEach(item => {
+const product = products.find(p => p.id === item.productId);
+if (!product) return;
+
+const subtotal = product.price * item.quantity;
+total += subtotal;
+
+const row = document.createElement("div");
+row.className = "cart-item";
+
+const details = document.createElement("div");
+
+const name = document.createElement("strong");
+name.textContent = product.name;
+
+const info = document.createElement("p");
+info.textContent =
+"₱" + product.price.toFixed(2) +
+" x " + item.quantity +
+" = ₱" + subtotal.toFixed(2);
+
+details.append(name, info);
+
+const controls = document.createElement("div");
+
+const minus = document.createElement("button");
+minus.className = "main-btn";
+minus.textContent = "-";
+minus.addEventListener("click", () => changeQuantity(item.productId, -1));
+
+const quantity = document.createElement("strong");
+quantity.textContent = item.quantity;
+
+const plus = document.createElement("button");
+plus.className = "main-btn";
+plus.textContent = "+";
+plus.addEventListener("click", () => changeQuantity(item.productId, 1));
+
+const remove = document.createElement("button");
+remove.className = "delete-btn";
+remove.textContent = "Remove";
+remove.addEventListener("click", () => removeFromCart(item.productId));
+
+controls.append(minus, quantity, plus, remove);
+row.append(details, controls);
+cartItems.appendChild(row);
+});
+
+document.getElementById("cartTotal").textContent =
+"Total: ₱" + total.toFixed(2);
+}
+
+// CHANGE QUANTITY
+function changeQuantity(id, amount) {
+const item = cart.find(item => item.productId === id);
+if (!item) return;
+
+item.quantity += amount;
+
+if (item.quantity <= 0) {
+cart = cart.filter(item => item.productId !== id);
+}
+
+saveData();
+displayCart();
+}
+
+// REMOVE CART ITEM
+function removeFromCart(id) {
+cart = cart.filter(item => item.productId !== id);
+saveData();
+displayCart();
+}
+
+// CLEAR CART
+function clearCart() {
+if (cart.length === 0) {
+alert("Your cart is already empty.");
+return;
+}
+
+if (confirm("Are you sure you want to clear your cart?")) {
+cart = [];
+saveData();
+displayCart();
+alert("Cart cleared!");
+}
+}
+
+// CHECKOUT
+function checkout() {
+if (cart.length === 0) {
+alert("Your cart is empty!");
+return;
+}
+
+const customerName = document.getElementById("customerName").value.trim();
+
+if (!customerName) {
+alert("Please enter your name.");
+return;
+}
+
+let total = 0;
+const orderedProducts = [];
+
+cart.forEach(item => {
+const product = products.find(p => p.id === item.productId);
+
+if (product) {
+const subtotal = product.price * item.quantity;
+total += subtotal;
+
+orderedProducts.push({
+name: product.name,
+price: product.price,
+quantity: item.quantity,
+subtotal
+});
+}
+});
+
+if (orderedProducts.length === 0) {
+alert("Your cart has no valid products.");
+return;
+}
+
+const order = {
+orderNumber: Date.now(),
+customer: customerName,
+date: new Date().toLocaleString(),
+notes: document.getElementById("orderNotes").value.trim(),
+items: orderedProducts,
+total,
+status: "Pending"
+};
+
+orders.unshift(order);
+cart = [];
+
+saveData();
+
+document.getElementById("customerName").value = "";
+document.getElementById("orderNotes").value = "";
+
+alert(
+"Order placed successfully!\n" +
+"Order Number: " + order.orderNumber +
+"\nTotal: ₱" + total.toFixed(2)
+);
+
+showPage("orders");
+}
+
+// DISPLAY ORDERS
+function displayOrders() {
+const orderList = document.getElementById("orderList");
+orderList.innerHTML = "";
+
+if (orders.length === 0) {
+orderList.innerHTML = '<p class="empty">No orders yet.</p>';
+return;
+}
+
+orders.forEach(order => {
+const box = document.createElement("div");
+box.className = "order-box";
+
+const heading = document.createElement("h3");
+heading.textContent = "Order #" + order.orderNumber;
+
+const customer = document.createElement("p");
+customer.textContent = "Customer: " + order.customer;
+
+const date = document.createElement("p");
+date.textContent = "Date: " + order.date;
+
+const status = document.createElement("p");
+status.textContent = "Status: " + order.status;
+
+box.append(heading, customer, date, status);
+
+const itemsTitle = document.createElement("strong");
+itemsTitle.textContent = "Ordered Products:";
+box.appendChild(itemsTitle);
+
+order.items.forEach(item => {
+const itemText = document.createElement("p");
+itemText.textContent =
+item.name + " x " + item.quantity +
+" - ₱" + item.subtotal.toFixed(2);
+
+box.appendChild(itemText);
+});
+
+const total = document.createElement("h3");
+total.className = "price";
+total.textContent = "Total: ₱" + order.total.toFixed(2);
+box.appendChild(total);
+
+if (order.notes) {
+const notes = document.createElement("p");
+notes.textContent = "Notes: " + order.notes;
+box.appendChild(notes);
+}
+
+if (order.status !== "Completed") {
+const completeButton = document.createElement("button");
+completeButton.className = "main-btn";
+completeButton.textContent = "Mark as Completed";
+
+completeButton.addEventListener("click", function() {
+order.status = "Completed";
+saveData();
+displayOrders();
+});
+
+box.appendChild(completeButton);
+}
+
+const deleteButton = document.createElement("button");
+deleteButton.className = "delete-btn";
+deleteButton.textContent = "Delete Order";
+
+deleteButton.addEventListener("click", function() {
+if (confirm("Delete this order?")) {
+orders = orders.filter(o => o.orderNumber !== order.orderNumber);
+saveData();
+displayOrders();
+}
+});
+
+box.appendChild(deleteButton);
+orderList.appendChild(box);
+});
+}
+
+// INITIAL DISPLAY
+displayProducts();
+displayCart();
+displayOrders();
